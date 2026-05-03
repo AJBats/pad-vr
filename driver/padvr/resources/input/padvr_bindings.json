@@ -1,0 +1,22 @@
+{
+    "bindings": {
+        "/actions/main": {
+            "sources": [
+                {
+                    "path": "/user/hand/right/input/trigger",
+                    "mode": "trigger",
+                    "inputs": {
+                        "click":  { "output": "/actions/main/in/Select" },
+                        "pull":   { "output": "/actions/main/in/SelectValue" }
+                    }
+                }
+            ],
+            "poses": [
+                { "output": "/actions/main/in/Pose", "path": "/user/hand/right/pose/raw" }
+            ]
+        }
+    },
+    "controller_type": "knuckles",
+    "description": "padVR gaze controller default bindings",
+    "name": "padVR default"
+}

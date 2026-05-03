@@ -1,0 +1,12 @@
+build/
+out/
+.vs/
+.vscode/
+CMakeUserPresets.json
+third_party/openvr/
+driver/padvr/bin/win64/*.dll
+driver/padvr/bin/win64/*.pdb
+driver/padvr/bin/win64/*.exp
+driver/padvr/bin/win64/*.lib
+*.exe
+*.obj
