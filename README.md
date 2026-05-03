@@ -43,6 +43,27 @@ and change `true` to `false`.
 Restart SteamVR, then run `build/companion/Release/padvr_companion.exe`.
 Leave it running whenever you want padVR active.
 
+### ⚠️ UEVR users — required per-game config change
+
+If you play any game through [UEVR](https://github.com/praydog/UEVR) (or
+UEVRDeluxe), you **must** disable UEVR's VR-controller mode for each game,
+or padVR's synth controller will hijack input and the game will stop
+responding to the gamepad after a button or two. UEVR auto-switches into
+motion-controller mode the moment it sees a VR controller in SteamVR, and
+padVR's synth controller looks like one.
+
+For each UEVR game, edit `%APPDATA%\UnrealVRMod\<GameName>\config.txt` and
+set:
+
+```
+VR_ControllersAllowed=false
+```
+
+(The line will already exist as `VR_ControllersAllowed=true` — just flip
+the value.) Re-inject UEVR / restart the game. The gamepad will now drive
+the game directly via UEVR's normal pass-through, and padVR continues to
+handle SteamVR dashboard navigation.
+
 ## Known issues
 
 - **padVR will intercept the Guide button.** If you leave the companion app
