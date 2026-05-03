@@ -6,6 +6,14 @@ navigate the SteamVR dashboard and play gamepad-friendly VR games.
 
 Replaces SteamVR's built-in `driver_gamepad`.
 
+## Features
+
+- **Trigger** (LT or RT) emulates the right VR controller's trigger — clicks
+  UI elements, pulls in-game triggers.
+- **Left analog stick** navigates SteamVR menus and dashboard lists.
+- **Guide / Xbox button tap** opens or closes the SteamVR dashboard.
+- **Guide / Xbox button hold (≥0.5s)** recenters the seated/standing view.
+
 ## Build
 
 Requires Windows, MSVC with C++17, CMake ≥ 3.20.
@@ -44,11 +52,8 @@ Restart SteamVR, then run `build/companion/Release/padvr_companion.exe`.
 Leave it running whenever you want padVR active - it stays fully passive
 when SteamVR isn't running, so it's safe to leave on 24/7.
 
-The companion is designed to run **silently** — no console window, no tray
-icon, no UI at all. It just sits as a background process. To verify it's
-running or to stop it, use **Task Manager** → find `padvr_companion.exe`
-in the Details tab → End Task. Launching the .exe twice is a no-op (the
-second instance detects the first via a named mutex and exits cleanly).
+The companion runs silently with no tray icon by design. Manage it with
+Task Manager.
 
 ### Optional: auto-start the companion on login
 
@@ -82,9 +87,6 @@ handle SteamVR dashboard navigation.
 
 ## Known issues
 
-- **padVR will intercept the Guide button.** If you leave the companion app
-  running in the background, it will prevent the guide button from interacting 
-  with Big Picture Mode.
 - **Real motion controllers won't work alongside an active XInput pad.**
   While the companion sees a powered-on gamepad, padVR's synth controller
   is live and steals the right-hand role. Fully power down your gamepad
