@@ -6,6 +6,7 @@
 #include <windows.h>
 #include <xinput.h>
 #include <shellapi.h>
+#include <tlhelp32.h>
 #include <atomic>
 #include <cstdio>
 #include <cstdint>
@@ -67,6 +68,29 @@ float NormalizeStick(SHORT v, SHORT deadzone) {
     if (v < -deadzone) return float(v + deadzone) / float(32768 - deadzone);
     return 0.0f;
 }
+
+// Walk the running process list for vrmonitor.exe / vrserver.exe. We use
+// this as our gate: while SteamVR is off, the companion stays fully passive
+// (no XInput polling, no URI dispatch) so Steam's Big Picture launcher
+// retains exclusive ownership of the Guide button on the desktop.
+bool IsSteamVRRunning() {
+    HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snap == INVALID_HANDLE_VALUE) return false;
+    PROCESSENTRY32 pe{};
+    pe.dwSize = sizeof(pe);
+    bool found = false;
+    if (Process32First(snap, &pe)) {
+        do {
+            if (_stricmp(pe.szExeFile, "vrmonitor.exe") == 0 ||
+                _stricmp(pe.szExeFile, "vrserver.exe")  == 0) {
+                found = true;
+                break;
+            }
+        } while (Process32Next(snap, &pe));
+    }
+    CloseHandle(snap);
+    return found;
+}
 }
 
 int main() {
@@ -119,7 +143,53 @@ int main() {
     auto lastReport = std::chrono::steady_clock::now();
     uint8_t lastBest = 0;
 
+    // Re-check the SteamVR process list every ~2s — cheap, and that latency
+    // is invisible because SteamVR itself takes ages to come up.
+    bool vrRunning = false;
+    auto lastVRCheck = std::chrono::steady_clock::now() - std::chrono::seconds(10);
+
+    // System-button state machine lives outside the loop body so we can
+    // reset it cleanly when SteamVR drops, avoiding a phantom dashboard
+    // toggle when SteamVR comes back up mid-press.
+    bool sysHeld = false;
+    bool recenterFired = false;
+    std::chrono::steady_clock::time_point sysPressTime{};
+
     while (!g_quit.load(std::memory_order_acquire)) {
+        // ---- SteamVR presence gate ----
+        auto checkNow = std::chrono::steady_clock::now();
+        if (checkNow - lastVRCheck >= std::chrono::seconds(2)) {
+            bool prev = vrRunning;
+            vrRunning = IsSteamVRRunning();
+            if (vrRunning != prev) {
+                std::printf("[steamvr] %s\n", vrRunning ? "detected" : "stopped");
+            }
+            lastVRCheck = checkNow;
+        }
+
+        if (!vrRunning) {
+            // Idle: no XInput polling (so Steam keeps the Guide button), no
+            // URI dispatch, shared mapping zeroed so the driver — even if
+            // somehow loaded — sees gamepadPresent=false.
+            state->triggerValue   = 0.0f;
+            state->triggerClick   = 0;
+            state->gamepadPresent = 0;
+            state->joystickX      = 0.0f;
+            state->joystickY      = 0.0f;
+            state->joystickClick  = 0;
+            state->sequence.store(++seq, std::memory_order_release);
+
+            // Reset the Guide-button state machine in case we're idling
+            // mid-press. Otherwise next active loop could fire a phantom
+            // dashboard-toggle on the inferred "release".
+            sysHeld = false;
+            recenterFired = false;
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            continue;
+        }
+
+        // ---- Active path: SteamVR is up ----
         DWORD nowConnected = 0;
         uint8_t bestTrig = 0;
         SHORT joyLX = 0, joyLY = 0;
@@ -163,27 +233,23 @@ int main() {
         //   tap (released < 500ms)  -> open/close SteamVR dashboard
         //   hold (>= 500ms)         -> recenter view (fires once at threshold)
         //   release after hold      -> nothing further
-        static bool                                 s_sysHeld = false;
-        static std::chrono::steady_clock::time_point s_sysPressTime{};
-        static bool                                 s_recenterFired = false;
-
-        if (sysBtn && !s_sysHeld) {
-            s_sysHeld = true;
-            s_sysPressTime = std::chrono::steady_clock::now();
-            s_recenterFired = false;
-        } else if (sysBtn && s_sysHeld && !s_recenterFired) {
-            auto held = std::chrono::steady_clock::now() - s_sysPressTime;
+        if (sysBtn && !sysHeld) {
+            sysHeld = true;
+            sysPressTime = std::chrono::steady_clock::now();
+            recenterFired = false;
+        } else if (sysBtn && sysHeld && !recenterFired) {
+            auto held = std::chrono::steady_clock::now() - sysPressTime;
             if (held >= std::chrono::milliseconds(kHoldThresholdMs)) {
                 std::printf("[sys] hold -> recenter\n");
                 ShellExecuteA(nullptr, "open", kURIRecenter, nullptr, nullptr, SW_HIDE);
-                s_recenterFired = true;
+                recenterFired = true;
             }
-        } else if (!sysBtn && s_sysHeld) {
-            if (!s_recenterFired) {
+        } else if (!sysBtn && sysHeld) {
+            if (!recenterFired) {
                 std::printf("[sys] tap -> dashboard toggle\n");
                 ShellExecuteA(nullptr, "open", kURIDashboardToggle, nullptr, nullptr, SW_HIDE);
             }
-            s_sysHeld = false;
+            sysHeld = false;
         }
 
         state->triggerValue   = float(bestTrig) / 255.0f;
