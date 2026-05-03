@@ -160,4 +160,4 @@ default behavior back. Restart SteamVR.
 
 ## License
 
-MIT.
+[Unlicense](LICENSE) — public domain.
