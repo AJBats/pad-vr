@@ -179,6 +179,7 @@ void PadVRController::RunFrame() {
     vr::VRDriverInput()->UpdateScalarComponent(m_joystickY,       joyY,     0.0);
     vr::VRDriverInput()->UpdateBooleanComponent(m_joystickClick,  joyClick, 0.0);
 
+#ifndef NDEBUG
     // Throttled debug: log on activation / trigger edges.
     static bool s_lastActive = false;
     static bool s_lastClick = false;
@@ -194,6 +195,7 @@ void PadVRController::RunFrame() {
     }
     s_lastActive = shouldBeOn;
     s_lastClick = triggerClick;
+#endif
 }
 
 } // namespace padvr

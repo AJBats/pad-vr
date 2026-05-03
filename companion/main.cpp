@@ -94,6 +94,16 @@ bool IsSteamVRRunning() {
 }
 
 int main() {
+    // Single-instance guard. If a padvr_companion process is already running
+    // (typical: user double-clicks the shell:startup shortcut after one's
+    // already auto-started on login), exit silently. The mutex is auto-
+    // released when whichever process owns it exits.
+    HANDLE singletonMutex = CreateMutexA(nullptr, FALSE, "Local\\padvr_companion_singleton");
+    if (GetLastError() == ERROR_ALREADY_EXISTS) {
+        if (singletonMutex) CloseHandle(singletonMutex);
+        return 0;
+    }
+
     SetConsoleCtrlHandler(CtrlHandler, TRUE);
 
     // Resolve XInputGetStateEx (ordinal 100) so we can read the Guide/Xbox
@@ -161,9 +171,13 @@ int main() {
         if (checkNow - lastVRCheck >= std::chrono::seconds(2)) {
             bool prev = vrRunning;
             vrRunning = IsSteamVRRunning();
+#ifndef NDEBUG
             if (vrRunning != prev) {
                 std::printf("[steamvr] %s\n", vrRunning ? "detected" : "stopped");
             }
+#else
+            (void)prev;
+#endif
             lastVRCheck = checkNow;
         }
 
@@ -240,13 +254,17 @@ int main() {
         } else if (sysBtn && sysHeld && !recenterFired) {
             auto held = std::chrono::steady_clock::now() - sysPressTime;
             if (held >= std::chrono::milliseconds(kHoldThresholdMs)) {
+#ifndef NDEBUG
                 std::printf("[sys] hold -> recenter\n");
+#endif
                 ShellExecuteA(nullptr, "open", kURIRecenter, nullptr, nullptr, SW_HIDE);
                 recenterFired = true;
             }
         } else if (!sysBtn && sysHeld) {
             if (!recenterFired) {
+#ifndef NDEBUG
                 std::printf("[sys] tap -> dashboard toggle\n");
+#endif
                 ShellExecuteA(nullptr, "open", kURIDashboardToggle, nullptr, nullptr, SW_HIDE);
             }
             sysHeld = false;
@@ -260,10 +278,11 @@ int main() {
         state->joystickClick  = joyLS ? 1 : 0;
         state->sequence.store(++seq, std::memory_order_release);
 
+#ifndef NDEBUG
         if (nowConnected != slotsConnected) {
             std::printf("[xinput] connected slot mask: 0x%lx\n", nowConnected);
-            slotsConnected = nowConnected;
         }
+        slotsConnected = nowConnected;
 
         auto now = std::chrono::steady_clock::now();
         bool crossed = (bestTrig >= kClickThreshold) != (lastBest >= kClickThreshold);
@@ -275,6 +294,9 @@ int main() {
             lastReport = now;
         }
         lastBest = bestTrig;
+#else
+        (void)slotsConnected; (void)lastReport; (void)lastBest;
+#endif
 
         std::this_thread::sleep_for(std::chrono::milliseconds(8)); // ~120 Hz
     }

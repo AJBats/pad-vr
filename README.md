@@ -41,9 +41,25 @@ Disable SteamVR's built-in gamepad driver so it can't fight padVR. In
 and change `true` to `false`.
 
 Restart SteamVR, then run `build/companion/Release/padvr_companion.exe`.
-Leave it running whenever you want padVR active.
+Leave it running whenever you want padVR active - it stays fully passive
+when SteamVR isn't running, so it's safe to leave on 24/7.
 
-### ⚠️ UEVR users — required per-game config change
+The companion is designed to run **silently** — no console window, no tray
+icon, no UI at all. It just sits as a background process. To verify it's
+running or to stop it, use **Task Manager** → find `padvr_companion.exe`
+in the Details tab → End Task. Launching the .exe twice is a no-op (the
+second instance detects the first via a named mutex and exits cleanly).
+
+### Optional: auto-start the companion on login
+
+1. Press `Win+R`, type `shell:startup`, hit Enter - opens
+   `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup`.
+2. Right-click in the folder → **New** → **Shortcut** → browse to your
+   `build\companion\Release\padvr_companion.exe` → finish.
+
+To disable, just delete the shortcut.
+
+### ⚠️ UEVR users - required per-game config change
 
 If you play any game through [UEVR](https://github.com/praydog/UEVR) (or
 UEVRDeluxe), you **must** disable UEVR's VR-controller mode for each game,
@@ -59,7 +75,7 @@ set:
 VR_ControllersAllowed=false
 ```
 
-(The line will already exist as `VR_ControllersAllowed=true` — just flip
+(The line will already exist as `VR_ControllersAllowed=true` - just flip
 the value.) Re-inject UEVR / restart the game. The gamepad will now drive
 the game directly via UEVR's normal pass-through, and padVR continues to
 handle SteamVR dashboard navigation.
